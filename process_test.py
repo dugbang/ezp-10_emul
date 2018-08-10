@@ -2,7 +2,10 @@ import os
 import time
 from multiprocessing import Queue, Process
 import queue
+import requests
 
+import logging
+from ezp_logger import EzpLog
 from hw_io_control import hw_io_control_process
 from usb_capture import usb_capture_process
 
@@ -11,6 +14,9 @@ class Communication:
     """
     메인프로세스로 main 에서 실행된다.
     """
+
+    # log = Ezp10Logging()
+
     def __init__(self):
         self.__queue = Queue()
         self.__q_usb = Queue()
@@ -54,49 +60,61 @@ class Communication:
         self.__q_hwio.close()
 
 
+def usb_capture_upload_test():
+    CAPTURE_URL = 'http://127.0.0.1:8000/gm_photos/upload/'
+    files = {'image': open('d:\Documents\앙키01.png', 'rb')}  # indicate > name
+    values = {'content': 'requests.post... 입력'}  # indicate > name
+
+    try:
+        r = requests.post(CAPTURE_URL, files=files, data=values)
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as errh:
+        print("Http Error:", errh)
+    except requests.exceptions.ConnectionError as errc:
+        print("Error Connecting:", errc)
+    except requests.exceptions.Timeout as errt:
+        print("Timeout Error:", errt)
+    except requests.exceptions.RequestException as err:
+        print("OOps: Something Else", err)
+
+
 def test_process():
 
     com = Communication()
     com.start()
 
-    # q_usb = Queue()
-    # q_hwio = Queue()
-    # q_main = Queue()
-    #
-    # print('main process pid; {}'.format(os.getpid()))
-    #
-    # process_usb = Process(target=usb_capture_process, args=(q_usb, q_main))
-    # process_hwio = Process(target=hw_io_control_process, args=(q_hwio, q_main))
-    # process_usb.start()
-    # process_hwio.start()
-    # time.sleep(2)
-    # # q_usb.put(('quit', 'test'))
-    # #
-    # while True:
-    #     try:
-    #         msg = q_main.get(False)
-    #     except queue.Empty:
-    #         print('main sleep 1')
-    #         time.sleep(1)
-    #         q_usb.put(('quit', 'uab test...'))
-    #         q_hwio.put(('quit', 'hw io test...'))
-    #     else:
-    #         print(msg)
-    #         if msg[0] == 'quit':
-    #             break
-    #
-    # process_usb.join()
-    # process_hwio.join()
-    #
-    # q_usb.close()
-    # q_hwio.close()
-    # q_main.close()
-
 
 if __name__ == "__main__":
     t = time.time()
 
-    test_process()
+    # Now, we can log to the root logger, or any other logger. First the root...
+    # logging.info('Jackdaws love my big sphinx of quartz.')
+
+    # logger1 = logging.getLogger('ezp-10.area1')
+    # logger2 = logging.getLogger('ezp-10.area2')
+
+    logger0 = EzpLog.log.get_logger()
+    logger1 = EzpLog.log.get_logger('area1')
+    logger2 = EzpLog.log.get_logger('area2')
+
+    logger1.setLevel(logging.WARNING)
+    logger1.debug('Quick zephyrs blow, vexing daft Jim.')
+    logger1.info('How quickly daft jumping zebras vex.')
+    logger1.critical('logger1 ... message...')
+    logger2.warning('Jail zesty vixen who grabbed pay from quack.')
+    logger2.error('The five boxing wizards jump quickly.')
+
+    logger0.critical('class... message...')
+
+    # log.debug('debug')
+    # log.info('info')
+    # log.warning('warning')
+    # log.error('error')
+    # log.critical('critical')
+
+    # test_process()
+
+    # usb_capture_upload_test()
 
     tm = time.localtime()
     process_time = (time.time() - t)

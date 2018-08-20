@@ -153,7 +153,7 @@ if __name__ == "__main__":
     # usb_capture_upload_test()
     # usb_capture_upload_with_login_test()
 
-    log = EzpLog.log.get_logger('test')
+    log = EzpLog.log.get_logger(__name__)
     log.setLevel(logging.DEBUG)
     log.debug('한글출력')
 

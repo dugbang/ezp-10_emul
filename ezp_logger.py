@@ -7,14 +7,18 @@ class Ezp10Logging:
         file_handler = logging.handlers.RotatingFileHandler(filename='./log/ezp-10.log', encoding='utf-8',
                                                             maxBytes=1024 * 1024, backupCount=10)
 
-        file_handler.setFormatter(logging.Formatter(fmt='[%(asctime)s] <%(name)s:%(levelname)s> '
-                                                    '(%(filename)s:%(lineno)-3d:%(funcName)s) > %(message)s',
+        # file_handler.setFormatter(logging.Formatter(fmt='[%(asctime)s] <%(name)s:%(levelname)s> '
+        #                                             '(%(filename)s:%(lineno)-3d:%(funcName)s) > %(message)s',
+        #                                             datefmt="%Y-%m-%d %H:%M:%S"))
+        file_handler.setFormatter(logging.Formatter(fmt='[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s',
                                                     datefmt="%Y-%m-%d %H:%M:%S"))
         self.root_logger.addHandler(file_handler)
 
         console = logging.StreamHandler()
-        console.setFormatter(logging.Formatter(fmt='<%(name)s: %(levelname)s> '
-                                               '(%(filename)s:%(lineno)-3d) > %(message)s',
+        # console.setFormatter(logging.Formatter(fmt='<%(name)s: %(levelname)s> '
+        #                                        '(%(filename)s:%(lineno)-3d) > %(message)s',
+        #                                        datefmt="%Y-%m-%d %H:%M:%S"))
+        console.setFormatter(logging.Formatter(fmt='%(levelname)s [%(name)s:%(lineno)s] %(message)s',
                                                datefmt="%Y-%m-%d %H:%M:%S"))
         self.root_logger.addHandler(console)
         self.root_logger.setLevel(logging.DEBUG)

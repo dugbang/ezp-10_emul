@@ -21,16 +21,3 @@
 1. 서버통신(메인) 프로세스
 1. USB 카메라 프로세스
 1. 입출력 제어 프로세스 _HW 준비전까지 가상의 정보를 전달_
-
-
-## 참고사이트
-
-* [파이썬 – 멀티프로세싱(Python – Multiprocessing) - AvILoS](http://avilos.codes/programming/python/python-multiprocessing/)
-  - 클래스를 사용한 예제 확인 > _Process 에서 파생된 클래스를 사용할 경우 에러가 발생함._
-  - 클래스를 이용한 방법은 사용하기 힘들다는 나름의 결론...ㅠ
-* [multiprocessing | Pool, Process, Queue](https://m.blog.naver.com/townpharm/220951524843)
-  - 프로세스 사용예
-* [17.2. multiprocessing — Process-based parallelism](https://docs.python.org/3.7/library/multiprocessing.html)
-  - 역시 가장 명확한 정보를 얻을 수 있는 곳...
-* [Python: Queue.Empty Exception Handling](https://stackoverflow.com/questions/11247439/python-queue-empty-exception-handling)
-  - 내용을 잘 모르겠으나 **METHOD2** 를 사용하라!!

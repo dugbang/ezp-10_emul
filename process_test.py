@@ -3,6 +3,7 @@ import time
 from multiprocessing import Queue, Process
 import queue
 import requests
+from bs4 import BeautifulSoup as bs
 
 import logging
 from ezp_logger import EzpLog
@@ -14,8 +15,6 @@ class Communication:
     """
     메인프로세스로 main 에서 실행된다.
     """
-
-    # log = Ezp10Logging()
 
     def __init__(self):
         self.__queue = Queue()
@@ -61,21 +60,83 @@ class Communication:
 
 
 def usb_capture_upload_test():
-    CAPTURE_URL = 'http://127.0.0.1:8000/gm_photos/upload/'
-    files = {'image': open('d:\Documents\앙키01.png', 'rb')}  # indicate > name
-    values = {'content': 'requests.post... 입력'}  # indicate > name
+    url_upload = 'http://127.0.0.1:8000/gm_photos/upload/'
+    values = {'content': 'requests.post... '}
+    files = {'image': open('d:\Documents\삼성카드해지01.png', 'rb')}
 
-    try:
-        r = requests.post(CAPTURE_URL, files=files, data=values)
-        r.raise_for_status()
-    except requests.exceptions.HTTPError as errh:
-        print("Http Error:", errh)
-    except requests.exceptions.ConnectionError as errc:
-        print("Error Connecting:", errc)
-    except requests.exceptions.Timeout as errt:
-        print("Timeout Error:", errt)
-    except requests.exceptions.RequestException as err:
-        print("OOps: Something Else", err)
+    log = EzpLog.log.get_logger('upload')
+    log.setLevel(logging.DEBUG)
+
+    with requests.Session() as s:
+
+        try:
+            first_page = s.get(url_upload)
+            soup = bs(first_page.text, 'html.parser')
+            csrf = soup.find('input', {'name': 'csrfmiddlewaretoken'})
+            values = {**values, **{'csrfmiddlewaretoken': csrf['value']}}
+            log.debug(values)
+
+            r = s.post(url_upload, files=files, data=values)
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as errh:
+            log.error("Http Error:", errh)
+        except requests.exceptions.ConnectionError as errc:
+            log.error("Error Connecting:", errc)
+        except requests.exceptions.Timeout as errt:
+            log.error("Timeout Error:", errt)
+        except requests.exceptions.RequestException as err:
+            log.error("OOps: Something Else", err)
+
+
+def usb_capture_upload_with_login_test():
+    # url = 'http://127.0.0.1:8000/gm_photos/upload/'
+    # values = {'content': 'requests.post... 입력'}  # indicate > name
+
+    url_upload = 'http://127.0.0.1:8000/photo/photo/add/'
+    UPLOAD_INFO = {'album': '3',  # select index 정보를 입력하여야 함...
+                   'title': 'test...01',
+                   'description': 'description requests.post',
+                   }  # indicate > name
+    files = {'image': open('d:\Documents\Screenshot_2015-10-28-15-14-46.png', 'rb')}
+
+    log = EzpLog.log.get_logger('upload login')
+    log.setLevel(logging.DEBUG)
+
+    url_login = 'http://127.0.0.1:8000/accounts/login/'
+    LOGIN_INFO = {
+        'username': 'raspi',
+        'password': 'passwd123'
+    }
+
+    # Session 생성, with 구문 안에서 유지
+    with requests.Session() as s:
+
+        try:
+            first_page = s.get(url_login)
+            csrf = bs(first_page.text, 'html.parser').find('input', {'name': 'csrfmiddlewaretoken'})
+            post_data = {**LOGIN_INFO, **{'csrfmiddlewaretoken': csrf['value']}}
+
+            r = s.post(url_login, data=post_data)
+            r.raise_for_status()
+            log.debug(r.status_code)
+
+            first_page = s.get(url_upload)
+            soup = bs(first_page.text, 'html.parser')
+            csrf = soup.find('input', {'name': 'csrfmiddlewaretoken'})
+            post_data = {**UPLOAD_INFO, **{'csrfmiddlewaretoken': csrf['value']}}
+
+            r = s.post(url_upload, files=files, data=post_data)
+            r.raise_for_status()
+            # log.debug(r.status_code)
+
+        except requests.exceptions.HTTPError as errh:
+            log.error("Http Error:", errh)
+        except requests.exceptions.ConnectionError as errc:
+            log.error("Error Connecting:", errc)
+        except requests.exceptions.Timeout as errt:
+            log.error("Timeout Error:", errt)
+        except requests.exceptions.RequestException as err:
+            log.error("OOps: Something Else", err)
 
 
 def test_process():
@@ -87,34 +148,14 @@ def test_process():
 if __name__ == "__main__":
     t = time.time()
 
-    # Now, we can log to the root logger, or any other logger. First the root...
-    # logging.info('Jackdaws love my big sphinx of quartz.')
-
-    # logger1 = logging.getLogger('ezp-10.area1')
-    # logger2 = logging.getLogger('ezp-10.area2')
-
-    logger0 = EzpLog.log.get_logger()
-    logger1 = EzpLog.log.get_logger('area1')
-    logger2 = EzpLog.log.get_logger('area2')
-
-    logger1.setLevel(logging.WARNING)
-    logger1.debug('Quick zephyrs blow, vexing daft Jim.')
-    logger1.info('How quickly daft jumping zebras vex.')
-    logger1.critical('logger1 ... message...')
-    logger2.warning('Jail zesty vixen who grabbed pay from quack.')
-    logger2.error('The five boxing wizards jump quickly.')
-
-    logger0.critical('class... message...')
-
-    # log.debug('debug')
-    # log.info('info')
-    # log.warning('warning')
-    # log.error('error')
-    # log.critical('critical')
-
     # test_process()
 
     # usb_capture_upload_test()
+    # usb_capture_upload_with_login_test()
+
+    log = EzpLog.log.get_logger('test')
+    log.setLevel(logging.DEBUG)
+    log.debug('한글출력')
 
     tm = time.localtime()
     process_time = (time.time() - t)

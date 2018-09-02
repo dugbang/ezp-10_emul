@@ -1,5 +1,7 @@
+import json
 import os
 import time
+from datetime import datetime
 from multiprocessing import Queue, Process
 import queue
 import requests
@@ -26,6 +28,8 @@ class Communication:
             Process(target=hw_io_control_process, args=(self.__q_hwio, self.__queue)),
         )
 
+        self.__capture_info = []
+
     def __run(self):
         while True:
             try:
@@ -33,12 +37,14 @@ class Communication:
             except queue.Empty:
                 print('main sleep 1')
                 time.sleep(1)
-                self.__q_usb.put(('quit', 'uab test...'))
-                self.__q_hwio.put(('quit', 'hw io test...'))
+                # self.__q_usb.put(('quit', 'uab test...'))
+                # self.__q_hwio.put(('quit', 'hw io test...'))
             else:
                 print(msg)
                 if msg[0] == 'quit':
                     break
+                elif msg[0] == 'capture':
+                    self.__capture_info.append((msg[1], msg[2]))
 
     def start(self):
         print('main process pid; {}'.format(os.getpid()))
@@ -139,23 +145,67 @@ def usb_capture_upload_with_login_test():
             log.error("OOps: Something Else", err)
 
 
-def test_process():
+def process_test():
 
     com = Communication()
     com.start()
 
 
+def json_upload_test():
+    url_upload_json = 'http://127.0.0.1:8000/ezp10/api/plant/'
+
+    data = {'name': '무우'}
+    req_post(data, url_upload_json)
+
+
+def bbs_upload_test():
+    url_upload_json = 'http://127.0.0.1:8000/bbs/'
+
+    # TODO; 복수개의 데이터 전송방법은?
+    data = {
+                "title": "title test json...3",
+                "author": "michael",
+                "pw": "qwer1234",
+                "content": "i am here.. json"
+            }
+    req_post(data, url_upload_json)
+
+
+def req_post(data, url_upload_json):
+    log = EzpLog.log.get_logger('rest framework')
+    headers = {'content-type': 'application/json'}
+    log.setLevel(logging.DEBUG)
+    with requests.Session() as s:
+        try:
+            r = s.post(url_upload_json, data=json.dumps(data), headers=headers)
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as errh:
+            log.error('Http Error:{}, status_code; {}'.format(errh, r.status_code))
+        except requests.exceptions.ConnectionError as errc:
+            log.error("Error Connecting:", errc)
+        except requests.exceptions.Timeout as errt:
+            log.error("Timeout Error:", errt)
+        except requests.exceptions.RequestException as err:
+            log.error("OOps: Something Else", err)
+
+
 if __name__ == "__main__":
     t = time.time()
 
-    # test_process()
+    print(len('2018-08-27 20:32:48'))
+    print('{}'.format(datetime.now())[:19])
+
+    # process_test()
+
+    # bbs_upload_test()
+    # json_upload_test()
 
     # usb_capture_upload_test()
     # usb_capture_upload_with_login_test()
 
-    log = EzpLog.log.get_logger(__name__)
-    log.setLevel(logging.DEBUG)
-    log.debug('한글출력')
+    # log = EzpLog.log.get_logger(__name__)
+    # log.setLevel(logging.DEBUG)
+    # log.debug('한글출력')
 
     tm = time.localtime()
     process_time = (time.time() - t)

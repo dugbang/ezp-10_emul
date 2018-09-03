@@ -1,68 +1,14 @@
 import json
-import os
 import time
 from datetime import datetime
-from multiprocessing import Queue, Process
-import queue
+
 import requests
 from bs4 import BeautifulSoup as bs
 
 import logging
 from ezp_logger import EzpLog
-from hw_io_control import hw_io_control_process
-from usb_capture import usb_capture_process
-
-
-class Communication:
-    """
-    메인프로세스로 main 에서 실행된다.
-    """
-
-    def __init__(self):
-        self.__queue = Queue()
-        self.__q_usb = Queue()
-        self.__q_hwio = Queue()
-
-        self.__process = (
-            Process(target=usb_capture_process, args=(self.__q_usb, self.__queue)),
-            Process(target=hw_io_control_process, args=(self.__q_hwio, self.__queue)),
-        )
-
-        self.__capture_info = []
-
-    def __run(self):
-        while True:
-            try:
-                msg = self.__queue.get(False)
-            except queue.Empty:
-                print('main sleep 1')
-                time.sleep(1)
-                # self.__q_usb.put(('quit', 'uab test...'))
-                # self.__q_hwio.put(('quit', 'hw io test...'))
-            else:
-                print(msg)
-                if msg[0] == 'quit':
-                    break
-                elif msg[0] == 'capture':
-                    self.__capture_info.append((msg[1], msg[2]))
-
-    def start(self):
-        print('main process pid; {}'.format(os.getpid()))
-
-        for process in self.__process:
-            process.start()
-
-        time.sleep(2)
-        self.__run()
-
-        for process in self.__process:
-            process.join()
-
-    def __del__(self):
-        print('Communication del... ')
-        self.__queue.close()
-        self.__q_usb.close()
-        self.__q_hwio.close()
+from main_process import MainProcess
+from usb_capture import UsbCapture
 
 
 def usb_capture_upload_test():
@@ -147,7 +93,7 @@ def usb_capture_upload_with_login_test():
 
 def process_test():
 
-    com = Communication()
+    com = MainProcess()
     com.start()
 
 
@@ -189,11 +135,45 @@ def req_post(data, url_upload_json):
             log.error("OOps: Something Else", err)
 
 
+def download_test():
+    url = 'http://127.0.0.1:8000/media/actuator/000123/2018-09-02/%EC%83%81%EC%B6%94_20180831.csv'
+    response = requests.get(url)
+    with open('output_state.csv', 'wb') as f:
+        f.write(response.content)
+
+
+def get_state_test():
+    url = 'http://127.0.0.1:8000/ezp10/api/controller/0001234/'
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        print(data)
+        u = UsbCapture()
+        u.set_state(data)
+        u.test_capture()
+
+
+def loop_step_test():
+    print('loop_step_test')
+    duration = 5
+    st_ = datetime.now()
+    for i in range(5):
+        while True:
+            ct_ = datetime.now()
+            time.sleep(1)
+            if (ct_ - st_).total_seconds() > duration:
+                st_ = ct_
+                break
+        print('step; {}'.format(i))
+
+
 if __name__ == "__main__":
     t = time.time()
 
-    print(len('2018-08-27 20:32:48'))
-    print('{}'.format(datetime.now())[:19])
+    # print(len('2018-08-27 20:32:48'))
+    # print('{}'.format(datetime.now())[:19])
+
+    get_state_test()
 
     # process_test()
 

@@ -2,6 +2,7 @@ import json
 import os
 import pickle
 import queue
+import sys
 import time
 from datetime import datetime, date
 from multiprocessing import Queue, Process
@@ -14,6 +15,7 @@ from usb_capture import usb_capture_process
 
 
 class Communication:
+    SERVER_ADDRESS = 'http://192.168.0.2:8000'
     FILE_STATE_PICKLE = 'controller_state.pickle'
     FILE_OUTPUT_TIMES = 'output_times.csv'  # 다른 프로세스에서 클래스의 정보교환이 가능한가?
 
@@ -21,15 +23,7 @@ class Communication:
         self.state = None
         self.duration = 60
         self.is_new_state = False
-        # self.is_new_output_times = False
 
-        # self.__fields = ('serial', 'is_active', 'plant',
-        #                  'minute_of_action_cycle', 'minute_of_upload_cycle',
-        #                  'iis_tank_capacity', 'iis_temperature', 'iis_ph', 'iis_mc',
-        #                  'iis_temp_humidity_high', 'iis_temp_humidity_low', 'iis_luminance', 'iis_co2',
-        #                  'ois_led', 'ois_pump', 'ois_pan_high', 'ois_pan_low',
-        #                  'is_usb_camera', 'modify_date', 'actuator_csv',
-        #                  'capture_times', 'stable_time_of_camera')
         self.__capture_records = []
         self.__io_records = []
 
@@ -40,18 +34,20 @@ class Communication:
 
     def add_io_records(self, records):
         self.__io_records.append(records)
+        print('__io_records len; {}'.format(len(self.__io_records)))
 
     def add_capture_records(self, records):
         self.__capture_records.append(records)
-        self.__delete_uploaded_file()
+        self.__delete_at_uploaded_file()
+        print('__capture_records len; {}'.format(len(self.__capture_records)))
 
-    def __delete_uploaded_file(self):
+    def __delete_at_uploaded_file(self):
         for filename in [r[1] for r in self.__capture_records if r[2]]:
             os.remove(filename)
         self.__capture_records = [r for r in self.__capture_records if not r[2]]
 
     def upload_data(self):
-        # print('upload_data...')
+        print('upload_data...')
         if self.__access_state is None:
             return
         self.__upload_capture_file()
@@ -62,15 +58,11 @@ class Communication:
 
     def set_state(self):
         self.is_new_state = False
-        # self.is_new_output_times = False
         self.__read_file_state()
         self.__access_server_state()
         if self.__read_state is None and self.__access_state is None:
-            # raise Exception('초기화 에러... 지속적인 대기 또는 종료')
-            print('초기화 에러... 지속적인 대기 또는 종료')
-            return
+            return False
         elif self.__read_state is None and self.__access_state is not None:
-            # self.__read_state = self.__access_state
             self.state = self.__access_state
             self.__save_state()
         elif self.__read_state is not None and self.__access_state is None:
@@ -84,9 +76,9 @@ class Communication:
                 self.__download_output_times()
 
         self.duration = 60 * self.state['minute_of_upload_cycle']
+        return True
 
     def __upload_capture_file(self):
-        print('__upload_capture_file..')
         data = {'plant': self.state['plant'], 'controller': self.state['serial']}
         files = {}
         for i, rec in enumerate(self.__capture_records):
@@ -168,6 +160,31 @@ class Communication:
         if response.status_code == 200:
             self.__access_state = response.json()
 
+    @staticmethod
+    def __get_serial():
+        cpuserial = '0' * 17
+        try:
+            with open('/proc/cpuinfo', 'r') as f:
+                for line in f:
+                    if line[0:6] == 'Serial':
+                        cpuserial = line[10:26]
+        except:
+            cpuserial = 'ERROR000000000'
+
+        return cpuserial
+
+    def set_address(self):
+        import platform
+        serial_ = '0001234'
+        if platform.system() == 'linux':
+            serial_ = self.__get_serial()
+        else:
+            Communication.SERVER_ADDRESS = 'http://127.0.0.1:8000'
+
+        self.__url_state = '{}/ezp10/api/controller/{}/'.format(Communication.SERVER_ADDRESS, serial_)
+        self.__url_capture = '{}/ezp10/capture/upload/'.format(Communication.SERVER_ADDRESS)
+        self.__url_io_report = '{}/ezp10/api/report/'.format(Communication.SERVER_ADDRESS)
+
 
 class MainProcess:
     """
@@ -188,15 +205,21 @@ class MainProcess:
 
         self.__comm = Communication()
 
-        # self.duration = 5 * 60
-
     def start(self):
         print('main process pid; {}'.format(os.getpid()))
 
         # TODO; 서버에서 상태정보를 읽어온다.
-        self.__comm.set_state()
+        self.__comm.set_address()
+        while not self.__comm.set_state():
+            print('초기화 에러... 주시적인 서버접속 또는 종료')
+            if self.__is_break():
+                sys.exit(1)
+            time.sleep(10)
+
         while not self.__comm.is_active():
             print('Not Active > {}'.format(datetime.now().strftime('%H:%M:%S')))
+            if self.__is_break():
+                sys.exit(1)
             time.sleep(self.__comm.duration / 10)
             self.__comm.set_state()
 
@@ -204,7 +227,6 @@ class MainProcess:
         for process in self.__process:
             process.start()
 
-        # time.sleep(0.5)
         self.__q_io.put(('set_state', self.__comm.state))
         self.__q_usb.put(('set_state', self.__comm.state))
         self.__run()
@@ -237,10 +259,8 @@ class MainProcess:
                     print('MainProcess... exit')
                     break
                 elif msg[0] == 'capture':
-                    print('MainProcess get; add_capture_records')
                     self.__comm.add_capture_records([msg[1], msg[2], False])
                 elif msg[0] == 'io_records':
-                    print('MainProcess get; add_io_records')
                     self.__comm.add_io_records(msg[1])
 
     def __msg_empty_loop(self):
@@ -249,8 +269,6 @@ class MainProcess:
         if self.__comm.is_new_state:
             self.__q_io.put(('set_state', self.__comm.state))
             self.__q_usb.put(('set_state', self.__comm.state))
-        # if self.__comm.is_new_output_times:
-        #     self.__q_io.put(('output_times',))
 
     def __valid_break(self):
         if self.__is_break():

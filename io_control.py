@@ -162,7 +162,4 @@ def io_control_process(q, q_main):
             elif msg[0] == 'set_state':
                 print('io_control_process get; set_state')
                 ctrl.set_state(msg[1])
-            elif msg[0] == 'output_times':
-                print('io_control_process get; output_times')
-                ctrl.read_file_output_times()
 

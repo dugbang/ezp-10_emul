@@ -1,4 +1,5 @@
 import json
+import pickle
 import time
 from datetime import datetime
 
@@ -7,7 +8,8 @@ from bs4 import BeautifulSoup as bs
 
 import logging
 from ezp_logger import EzpLog
-from main_process import MainProcess
+from ez_controller import MainProcess, Communication
+from io_control import IoControl
 from usb_capture import UsbCapture
 
 
@@ -91,12 +93,6 @@ def usb_capture_upload_with_login_test():
             log.error("OOps: Something Else", err)
 
 
-def process_test():
-
-    com = MainProcess()
-    com.start()
-
-
 def json_upload_test():
     url_upload_json = 'http://127.0.0.1:8000/ezp10/api/plant/'
 
@@ -135,22 +131,22 @@ def req_post(data, url_upload_json):
             log.error("OOps: Something Else", err)
 
 
-def download_test():
-    url = 'http://127.0.0.1:8000/media/actuator/000123/2018-09-02/%EC%83%81%EC%B6%94_20180831.csv'
-    response = requests.get(url)
-    with open('output_state.csv', 'wb') as f:
-        f.write(response.content)
-
-
 def get_state_test():
     url = 'http://127.0.0.1:8000/ezp10/api/controller/0001234/'
     response = requests.get(url)
     if response.status_code == 200:
-        data = response.json()
-        print(data)
+        state_ = response.json()
+        print(state_)
         u = UsbCapture()
-        u.set_state(data)
+        u.set_state(state_)
         u.test_capture()
+
+        response = requests.get(state_['actuator_csv'])
+        with open('output_state.csv', 'wb') as f:
+            f.write(response.content)
+
+        with open('controller_state.pickle', 'wb') as f:
+            pickle.dump(state_, f, pickle.HIGHEST_PROTOCOL)
 
 
 def loop_step_test():
@@ -167,34 +163,82 @@ def loop_step_test():
         print('step; {}'.format(i))
 
 
+def upload_capture():
+    # http://127.0.0.1:8000/ezp10/capture/upload/
+    url = 'http://127.0.0.1:8000/ezp10/capture/upload/'
+    files = {'image': open('capture/20180911_1511.png', 'rb')}
+    # data = {'plant': 1, 'controller': '0001234', 'create_at': '2018-08-27 20:32:48'}
+    st_ = datetime.now()
+    data = {'plant': 1, 'controller': '0001234', 'create_at': st_}
+
+    with requests.Session() as s:
+
+        first_page = s.get(url)
+        soup = bs(first_page.text, 'html.parser')
+        csrf = soup.find('input', {'name': 'csrfmiddlewaretoken'})
+        post_data = {**data, **{'csrfmiddlewaretoken': csrf['value']}}
+
+        res = s.post(url, files=files, data=post_data)
+        if res.status_code == 200:
+            print('ok')
+
+        print('post_file_data res.status_code; ', res.status_code)
+
+
 if __name__ == "__main__":
-    t = time.time()
+    st = datetime.now()
+
+    upload_capture()
 
     # print(len('2018-08-27 20:32:48'))
     # print('{}'.format(datetime.now())[:19])
 
-    get_state_test()
+    # comm = Communication()
+    # comm.set_state()
+    # # print(comm.state)
+    # while not comm.is_active():
+    #     print('{} >> sleep; {}'.format(datetime.now().strftime('%H:%M:%S'), comm.duration/10))
+    #     time.sleep(comm.duration/10)
+    #     comm.set_state()
+    #     # break
+    #
+    # str_now = '{}'.format(datetime.now())
+    # print(str_now)
+    # comm.add_capture_records((datetime.now(), 'capture/20180911_1511.png'))
+    # comm.upload_data()
 
-    # process_test()
+# =======================================================
 
-    # bbs_upload_test()
-    # json_upload_test()
-
-    # usb_capture_upload_test()
-    # usb_capture_upload_with_login_test()
+    # print(comm.state)
+    # print('{}'.format(datetime.now().strftime('%H:%M:%S')))
+    #
+    # u = UsbCapture()
+    # u.set_state(comm.state)
+    # if u.is_exist():
+    #     u.test_capture()
+    #     print(u.capture_date, u.capture_filename)
+    #
+    # ctrl = IoControl()
+    # ctrl.set_state(comm.state)
+    # ctrl.hw_output()
+    # ctrl.hw_input()
+    # print(ctrl.records)
+    #
+    # comm.add_capture_records((datetime.now(), 'capture/20180911_1511.png'))
+    # comm.upload_data()
 
     # log = EzpLog.log.get_logger(__name__)
     # log.setLevel(logging.DEBUG)
     # log.debug('한글출력')
 
-    tm = time.localtime()
-    process_time = (time.time() - t)
+    et = datetime.now()
+    process_time = int((et - st).total_seconds())
     if process_time < 100:
         print(__file__, 'Python Elapsed {:.02f} seconds, '
-                        'current time; {:02d}:{:02d}'.format(process_time, tm.tm_hour, tm.tm_min))
+                        'current time; {}'.format(process_time, et.strftime('%H:%M')))
     elif process_time < 6000:
         print(__file__, 'Python Elapsed {:.02f} minute, '
-                        'current time; {:02d}:{:02d}'.format(process_time / 60, tm.tm_hour, tm.tm_min))
+                        'current time; {}'.format(process_time / 60, et.strftime('%H:%M')))
     else:
         print(__file__, 'Python Elapsed {:.02f} hours, '
-                        'current time; {:02d}:{:02d}'.format(process_time / 3600, tm.tm_hour, tm.tm_min))
+                        'current time; {}'.format(process_time / 3600, et.strftime('%H:%M')))

@@ -2,7 +2,6 @@ import os
 import queue
 import time
 from datetime import datetime
-import cv2
 
 
 class UsbCapture:
@@ -13,18 +12,8 @@ class UsbCapture:
         self.capture_filename = ''
         self.capture_date = ''
 
-        self.__state = {'is_usb_camera': False,
-                        'capture_times': '0900,1200,1800',
-                        'stable_time_of_camera': 5}
-        self.__fields = ('is_usb_camera', 'capture_times', 'stable_time_of_camera')
-
-        # self.__fields = ('serial', 'is_action', 'plant',
-        #                  'minute_of_action_cycle', 'minute_of_upload_cycle',
-        #                  'iis_tank_capacity', 'iis_temperature', 'iis_ph', 'iis_mc',
-        #                  'iis_temp_humidity_high', 'iis_temp_humidity_low', 'iis_luminance', 'iis_co2',
-        #                  'ois_led', 'ois_pump', 'ois_pan_high', 'ois_pan_low',
-        #                  'is_usb_camera', 'modify_date', 'actuator_csv',
-        #                  'capture_times', 'stable_time_of_camera')
+        self.__state = {}
+        self.__fields = ('is_active', 'is_usb_camera', 'capture_times', 'stable_time_of_camera')
 
     def set_state(self, total_state):
         for field in self.__fields:
@@ -32,35 +21,57 @@ class UsbCapture:
 
         self.__capture_times = self.__state['capture_times'].split(',')
 
+    def is_active(self):
+        return self.__state['is_active']
+
     def is_exist(self):
         return self.__state['is_usb_camera']
 
     def is_capture_time(self, test_flag=False):
-        tm_ = time.localtime()
-        s_time = '{:02d}{:02d}'.format(tm_.tm_hour, tm_.tm_min)
+        s_time = datetime.now().strftime('%H%M')
         if test_flag:
-            self.__capture_times.append(s_time)
+            self.__select_time = s_time
+            return True
+
+        if self.__select_time == s_time:
+            return False
         if s_time in self.__capture_times:
             self.__select_time = s_time
             return True
         return False
 
-    def capture(self):
+    def __capture_on_windows(self):
+        import cv2
         cap = cv2.VideoCapture(0)
         st_ = datetime.now()
-        while True:
+        ret = False
+        while cap.isOpened():
             ret, frame = cap.read()
             ct_ = datetime.now()
             if (ct_ - st_).total_seconds() > self.__state['stable_time_of_camera']:
+                self.capture_date = ct_
+                self.capture_filename = 'capture/{}_{}.png'.format(ct_.strftime('%Y%m%d'), self.__select_time)
+                cv2.imwrite(self.capture_filename, frame)  # capture...
+                ret = True
                 break
-
-        # self.capture_date = '{}'.format(ct_)[:19]  # '{}'.format(datetime.now())[:19]
-        self.capture_date = ct_
-        self.capture_filename = 'capture/{}_{}.png'.format(ct_.strftime('%Y%m%d'), self.__select_time)
-        cv2.imwrite(self.capture_filename, frame)
 
         cap.release()
         cv2.destroyAllWindows()
+        return ret
+
+    def __capture_on_linux(self):
+        self.capture_date = datetime.now()
+        self.capture_filename = 'capture/{}_{}.png'.format(self.capture_date.strftime('%Y%m%d'), self.__select_time)
+        os.system('fswebcam -r 1920x1080 --no-banner {}'.format(self.capture_filename))
+
+        return os.path.exists(self.capture_filename)
+
+    def capture(self):
+        import platform
+        if platform.system() == 'linux':
+            return self.__capture_on_linux()
+        else:
+            return self.__capture_on_windows()
 
     def test_capture(self):
         if self.is_capture_time(test_flag=True):
@@ -77,14 +88,19 @@ def usb_capture_process(q, q_main):
             msg = q.get(False)
         except queue.Empty:
             time.sleep(1)
+            if not u.is_active() or not u.is_exist():
+                continue
 
-            if u.is_exist() and u.is_capture_time():
-                u.capture()
-                q_main.put(('capture', u.capture_date, u.capture_filename))
+            if u.is_capture_time():
+                print('is_capture_time....')
+                if u.capture():
+                    q_main.put(('capture', u.capture_date, u.capture_filename))
+                    # time.sleep(1)
         else:
             if msg[0] == 'quit':
-                q_main.put(('quit', 'usb_capture_process... exit'))
+                print('usb_capture_process... exit')
                 break
             elif msg[0] == 'set_state':
+                print('usb_capture_process get; set_state')
                 u.set_state(msg[1])
 

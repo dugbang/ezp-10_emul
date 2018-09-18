@@ -15,7 +15,7 @@ from usb_capture import usb_capture_process
 
 
 class Communication:
-    SERVER_ADDRESS = 'http://192.168.0.2:8000'
+    SERVER_ADDRESS = 'http://192.168.0.100:8000'
     FILE_STATE_PICKLE = 'controller_state.pickle'
     FILE_OUTPUT_TIMES = 'output_times.csv'  # 다른 프로세스에서 클래스의 정보교환이 가능한가?
 
@@ -28,9 +28,9 @@ class Communication:
         self.__io_records = []
 
         # TODO; 실제 url 은 나중에 갱신.
-        self.__url_state = 'http://127.0.0.1:8000/ezp10/api/controller/0001234/'
-        self.__url_capture = 'http://127.0.0.1:8000/ezp10/capture/upload/'
-        self.__url_io_report = 'http://127.0.0.1:8000/ezp10/api/report/'
+        self.__url_state = 'http://127.0.0.1:8000/ezfarmer/api/controller/0001234/'
+        self.__url_capture = 'http://127.0.0.1:8000/ezfarmer/capture/upload/'
+        self.__url_io_report = 'http://127.0.0.1:8000/ezfarmer/api/report/'
 
     def add_io_records(self, records):
         self.__io_records.append(records)
@@ -75,6 +75,8 @@ class Communication:
             if self.__read_state['actuator_csv'] != self.__access_state['actuator_csv']:
                 self.__download_output_times()
 
+        if not os.path.exists(Communication.FILE_OUTPUT_TIMES):
+            self.__download_output_times()
         self.duration = 60 * self.state['minute_of_upload_cycle']
         return True
 
@@ -148,6 +150,14 @@ class Communication:
         with open(Communication.FILE_OUTPUT_TIMES, 'wb') as f:
             f.write(response.content)
 
+        self.__wait_download(Communication.FILE_OUTPUT_TIMES)
+
+    @staticmethod
+    def __wait_download(filename):
+        print('__wait_download')
+        while not os.path.exists(filename):
+            time.sleep(1)
+
     def __read_file_state(self):
         self.__read_state = None
         if os.path.exists(Communication.FILE_STATE_PICKLE):
@@ -175,15 +185,15 @@ class Communication:
 
     def set_address(self):
         import platform
-        serial_ = '0001234'
-        if platform.system() == 'linux':
+        serial_ = '000123'
+        if platform.system() == 'Linux':
             serial_ = self.__get_serial()
         else:
             Communication.SERVER_ADDRESS = 'http://127.0.0.1:8000'
 
-        self.__url_state = '{}/ezp10/api/controller/{}/'.format(Communication.SERVER_ADDRESS, serial_)
-        self.__url_capture = '{}/ezp10/capture/upload/'.format(Communication.SERVER_ADDRESS)
-        self.__url_io_report = '{}/ezp10/api/report/'.format(Communication.SERVER_ADDRESS)
+        self.__url_state = '{}/ezfarmer/api/controller/{}/'.format(Communication.SERVER_ADDRESS, serial_)
+        self.__url_capture = '{}/ezfarmer/capture/upload/'.format(Communication.SERVER_ADDRESS)
+        self.__url_io_report = '{}/ezfarmer/api/report/'.format(Communication.SERVER_ADDRESS)
 
 
 class MainProcess:
@@ -216,14 +226,14 @@ class MainProcess:
                 sys.exit(1)
             time.sleep(10)
 
-        while not self.__comm.is_active():
-            print('Not Active > {}'.format(datetime.now().strftime('%H:%M:%S')))
-            if self.__is_break():
-                sys.exit(1)
-            time.sleep(self.__comm.duration / 10)
-            self.__comm.set_state()
-
-        print('Active > {}'.format(datetime.now().strftime('%H:%M:%S')))
+        # while not self.__comm.is_active():
+        #     print('Not Active > {}'.format(datetime.now().strftime('%H:%M:%S')))
+        #     if self.__is_break():
+        #         sys.exit(1)
+        #     time.sleep(self.__comm.duration / 10)
+        #     self.__comm.set_state()
+        #
+        # print('Active > {}'.format(datetime.now().strftime('%H:%M:%S')))
         for process in self.__process:
             process.start()
 
@@ -283,20 +293,20 @@ class MainProcess:
 
 
 if __name__ == "__main__":
-    st = datetime.now()
+    # st = datetime.now()
 
     controller = MainProcess()
     controller.start()
 
-    et = datetime.now()
-    process_time = int((et - st).total_seconds())
-    if process_time < 100:
-        print(__file__, 'Python Elapsed {:.02f} seconds, '
-                        'current time; {}'.format(process_time, et.strftime('%H:%M')))
-    elif process_time < 6000:
-        print(__file__, 'Python Elapsed {:.02f} minute, '
-                        'current time; {}'.format(process_time / 60, et.strftime('%H:%M')))
-    else:
-        print(__file__, 'Python Elapsed {:.02f} hours, '
-                        'current time; {}'.format(process_time / 3600, et.strftime('%H:%M')))
+    # et = datetime.now()
+    # process_time = int((et - st).total_seconds())
+    # if process_time < 100:
+    #     print(__file__, 'Python Elapsed {:.02f} seconds, '
+    #                     'current time; {}'.format(process_time, et.strftime('%H:%M')))
+    # elif process_time < 6000:
+    #     print(__file__, 'Python Elapsed {:.02f} minute, '
+    #                     'current time; {}'.format(process_time / 60, et.strftime('%H:%M')))
+    # else:
+    #     print(__file__, 'Python Elapsed {:.02f} hours, '
+    #                     'current time; {}'.format(process_time / 3600, et.strftime('%H:%M')))
 

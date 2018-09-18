@@ -38,12 +38,16 @@ def test02():
 
     output = {}
     # TODO; linux 에서 문제없이 동작하는지 확인하기(윈도에서 확인됨)
-    with open('output_state.csv', 'r', encoding='utf-8') as f:
+    with open('output_times.csv', 'r', encoding='utf-8') as f:
         for line in csv.reader(f, delimiter='\t'):
             output[line[0]] = line[1:]
 
     # for key in output.keys():
     #     print(key, output[key])
+    for i, key in enumerate(output):
+        if i > 9:
+            break
+        print(key, output[key])
 
     key = datetime.now().strftime('%H%M')
     print(key, output[key])
@@ -82,7 +86,7 @@ if __name__ == "__main__":
 
     # test_io_ctrl()
 
-    test01()
+    test02()
 
     et = datetime.now()
     process_time = int((et - st).total_seconds())

@@ -160,6 +160,6 @@ def io_control_process(q, q_main):
                 print('io_control_process... exit')
                 break
             elif msg[0] == 'set_state':
-                print('io_control_process get; set_state')
+                print('io_control_process get; set_state > current time; {}'.format(datetime.now().strftime('%H:%M')))
                 ctrl.set_state(msg[1])
 

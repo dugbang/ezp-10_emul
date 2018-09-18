@@ -60,6 +60,8 @@ class UsbCapture:
         return ret
 
     def __capture_on_linux(self):
+        if not os.path.exists('/dev/video0'):
+            return False
         self.capture_date = datetime.now()
         self.capture_filename = 'capture/{}_{}.png'.format(self.capture_date.strftime('%Y%m%d'), self.__select_time)
         os.system('fswebcam -r 1920x1080 --no-banner {}'.format(self.capture_filename))
@@ -68,7 +70,7 @@ class UsbCapture:
 
     def capture(self):
         import platform
-        if platform.system() == 'linux':
+        if platform.system() == 'Linux':
             return self.__capture_on_linux()
         else:
             return self.__capture_on_windows()
@@ -101,6 +103,6 @@ def usb_capture_process(q, q_main):
                 print('usb_capture_process... exit')
                 break
             elif msg[0] == 'set_state':
-                print('usb_capture_process get; set_state')
+                print('usb_capture_process get; set_state > current time; {}'.format(datetime.now().strftime('%H:%M')))
                 u.set_state(msg[1])
 
